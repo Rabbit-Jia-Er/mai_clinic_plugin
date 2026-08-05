@@ -116,11 +116,30 @@ async def execute_send_feed(plugin, **kwargs: Any) -> tuple[bool, str]:
 # ===== read_feed Tool =====
 
 
+def _parse_enable_comment(value: Any, default: bool = True) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in {"", "default", "默认"}:
+        return default
+    if text in {"0", "false", "no", "n", "off", "否", "不", "不回复", "不评论", "skip", "none"}:
+        return False
+    if text in {"1", "true", "yes", "y", "on", "是", "回复", "评论"}:
+        return True
+    return default
+
+
 async def execute_read_feed(plugin, **kwargs: Any) -> tuple[bool, str]:
     """read_feed Tool 入口。"""
     user_name = (kwargs.get("user_name") or "").strip()
     target_name = (kwargs.get("target_name") or "").strip()
     stream_id = kwargs.get("stream_id") or kwargs.get("chat_id") or ""
+    enable_comment = _parse_enable_comment(
+        kwargs.get("enable_comment", kwargs.get("do_comment", kwargs.get("reply"))),
+        default=True,
+    )
 
     # 调用者权限
     user_id, _ = await _resolve_person(plugin, user_name) if user_name else ("", "")
@@ -145,6 +164,7 @@ async def execute_read_feed(plugin, **kwargs: Any) -> tuple[bool, str]:
     success, result = await read_and_engage(
         plugin, target_qq, target_name_resolved, num,
         processed_list, cache_size=cache_size,
+        enable_comment=enable_comment,
     )
     await save_processed_list(processed_list)
 
@@ -153,5 +173,6 @@ async def execute_read_feed(plugin, **kwargs: Any) -> tuple[bool, str]:
         return False, str(result)
 
     feeds = result if isinstance(result, list) else []
-    await _send_text(plugin, f"已阅读 {target_name_resolved} 的 {len(feeds)} 条说说", stream_id)
+    suffix = "（未评论）" if not enable_comment else ""
+    await _send_text(plugin, f"已阅读 {target_name_resolved} 的 {len(feeds)} 条说说{suffix}", stream_id)
     return True, "success"

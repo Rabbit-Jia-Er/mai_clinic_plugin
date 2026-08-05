@@ -18,6 +18,39 @@ from .qzone_api import QzoneAPI, create_qzone_api
 logger = get_logger(__name__)
 
 
+def _is_skip_comment(text) -> bool:
+    """LLM 选择不评论时返回 True。"""
+    if text is None:
+        return True
+    t = str(text).strip()
+    if not t:
+        return True
+    for _ in range(2):
+        t = t.strip().strip("\"'“”‘’`")
+        if len(t) >= 2 and t[0] in "[(（【" and t[-1] in "])）】":
+            t = t[1:-1].strip()
+    normalized = "".join(t.split()).lower()
+    return normalized in {
+        "不回复", "不评论", "跳过", "无", "无评论",
+        "无需回复", "不用回复", "不必回复",
+        "skip", "none", "n/a", "na", "null",
+    }
+
+
+_SKIP_PROMPT_SUFFIX = (
+    "。如果你觉得没必要评论（内容无感、不适合插嘴、太隐私、广告、重复水帖等），"
+    "只输出三个字：不回复；否则只输出评论正文"
+)
+
+
+def _with_skip_prompt(prompt: str, allow_skip: bool) -> str:
+    if not allow_skip:
+        return prompt
+    if "不回复" in prompt:
+        return prompt
+    return prompt.rstrip() + _SKIP_PROMPT_SUFFIX
+
+
 async def renew_cookies_from_plugin(plugin) -> bool:
     """便捷封装：从 plugin 取所有参数刷 cookie。"""
     uin = await get_global_str(plugin.ctx, "bot.qq_account", "")
@@ -131,8 +164,12 @@ async def read_and_engage(
     processed_list: dict[str, list[str]],
     *,
     cache_size: int = 100,
+    enable_comment: bool = True,
 ) -> tuple[bool, list[dict[str, Any]] | str]:
     """读说说 + 按概率点赞评论。会修改 processed_list（去重缓存）。
+
+    Args:
+        enable_comment: False 时只读/点赞，不发表评论。
 
     Returns:
         (success, feeds_list_or_error_message)
@@ -163,6 +200,7 @@ async def read_and_engage(
     )
     like_p = plugin.config.read.like_probability
     comment_p = plugin.config.read.comment_probability
+    allow_skip = bool(getattr(plugin.config.read, "allow_skip_comment", True))
     show_prompt = plugin.config.llm.show_prompt
 
     for feed in feeds_list:
@@ -179,23 +217,29 @@ async def read_and_engage(
         rt_con = feed.get("rt_con", "")
         created_time = feed.get("created_time", "")
 
-        if random.random() <= comment_p:
+        if enable_comment and random.random() <= comment_p:
             prompt = build_comment_prompt(
                 plugin, target_name, content, created_time,
                 persona.personality, persona.style, impression, rt_con,
                 self_description=persona.self_description,
             )
+            prompt = _with_skip_prompt(prompt, allow_skip)
             if show_prompt:
                 logger.info("评论 prompt: %s", prompt)
             success, comment_message = await runner.generate(prompt, temperature=0.3)
             if success and comment_message:
-                ok = await qzone.comment(fid, target_qq, comment_message)
-                if ok:
-                    logger.info("评论成功: %s", comment_message)
+                if allow_skip and _is_skip_comment(comment_message):
+                    logger.info("选择不评论: %s", comment_message)
                 else:
-                    logger.warning("评论失败")
+                    ok = await qzone.comment(fid, target_qq, comment_message)
+                    if ok:
+                        logger.info("评论成功: %s", comment_message)
+                    else:
+                        logger.warning("评论失败")
             else:
                 logger.warning("生成评论失败: %s", comment_message)
+        elif not enable_comment:
+            logger.info("本次读空间关闭评论，跳过说说 %s", fid)
 
         if random.random() <= like_p:
             ok = await qzone.like(fid, target_qq)

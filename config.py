@@ -25,19 +25,19 @@ _DEFAULT_SEND_PROMPT = (
 
 _DEFAULT_READ_PROMPT = (
     "你是'{bot_personality}'，你正在浏览你好友'{target_name}'的QQ空间，你看到了你的好友'{target_name}'"
-    "在qq空间上在'{created_time}'发了一条内容是'{content}'的说说，你想要发表你的一条评论，现在是'{current_time}'"
+    "在qq空间上在'{created_time}'发了一条内容是'{content}'的说说，现在是'{current_time}'"
     "你对'{target_name}'的印象是'{impression}'，若与你的印象点相关，可以适当评论相关内容，无关则忽略此印象，"
     "{bot_expression}，回复的平淡一些，简短一些，说中文，不要刻意突出自身学科背景，不要浮夸，不要夸张修辞，不要输出多余内容"
-    "(包括前后缀，冒号和引号，括号()，表情包，at或 @等 )。只输出回复内容"
+    "(包括前后缀，冒号和引号，括号()，表情包，at或 @等 )。若没必要评论只输出不回复，否则只输出评论正文"
 )
 
 _DEFAULT_RT_PROMPT = (
     "你是'{bot_personality}'，你正在浏览你好友'{target_name}'的QQ空间，你看到了你的好友'{target_name}'"
     "在qq空间上在'{created_time}'转发了一条内容为'{rt_con}'的说说，你的好友的评论为'{content}'，你对'{"
     "target_name}'的印象是'{impression}'，若与你的印象点相关，可以适当评论相关内容，无关则忽略此印象，"
-    "现在是'{current_time}'，你想要发表你的一条评论，{bot_expression}，"
+    "现在是'{current_time}'，{bot_expression}，"
     "回复的平淡一些，简短一些，说中文，不要刻意突出自身学科背景，不要浮夸，不要夸张修辞，"
-    "不要输出多余内容(包括前后缀，冒号和引号，括号()，表情包，at或 @等 )。只输出回复内容"
+    "不要输出多余内容(包括前后缀，冒号和引号，括号()，表情包，at或 @等 )。若没必要评论只输出不回复，否则只输出评论正文"
 )
 
 _DEFAULT_REPLY_PROMPT = (
@@ -355,6 +355,15 @@ class ReadSection(PluginConfigBase):
             "order": 5,
         },
         validation_alias=AliasChoices("comment_probability", "comment_possibility"),
+    )
+    allow_skip_comment: bool = Field(
+        default=True,
+        description="读别人空间时是否允许模型选择不评论（输出「不回复」则跳过）。",
+        json_schema_extra={
+            "label": "允许不评论",
+            "hint": "开启后模型可输出「不回复」跳过评论",
+            "order": 6,
+        },
     )
     prompt: str = Field(
         default=_DEFAULT_READ_PROMPT,

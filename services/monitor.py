@@ -203,22 +203,29 @@ class FeedMonitor:
         cfg_monitor = self.plugin.config.monitor
         impression = await _get_impression(self.plugin, target_qq)
 
-        # 评论
+        # 评论（可由 LLM 选择不回复）
         if allow_comment and random.random() <= cfg_monitor.comment_probability:
+            from .feed_read import _is_skip_comment, _with_skip_prompt
+
+            allow_skip = bool(getattr(self.plugin.config.read, "allow_skip_comment", True))
             prompt = build_comment_prompt(
                 self.plugin, target_qq, content, created_time,
                 persona.personality, persona.style, impression, rt_con,
                 self_description=persona.self_description,
             )
+            prompt = _with_skip_prompt(prompt, allow_skip)
             if show_prompt:
                 logger.info("评论 prompt: %s", prompt)
             success, comment_text = await runner.generate(prompt, temperature=0.3)
             if success and comment_text:
-                ok = await qzone.comment(fid, target_qq, comment_text)
-                if ok:
-                    logger.info("成功评论 %s: %s", target_qq, comment_text)
+                if allow_skip and _is_skip_comment(comment_text):
+                    logger.info("选择不评论 %s: %s", target_qq, comment_text)
                 else:
-                    logger.warning("评论失败 %s", target_qq)
+                    ok = await qzone.comment(fid, target_qq, comment_text)
+                    if ok:
+                        logger.info("成功评论 %s: %s", target_qq, comment_text)
+                    else:
+                        logger.warning("评论失败 %s", target_qq)
             else:
                 logger.warning("生成评论失败: %s", comment_text)
         else:

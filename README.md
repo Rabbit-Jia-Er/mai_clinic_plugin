@@ -149,7 +149,10 @@ await self.ctx.api.call(
 | `permission` / `permission_type` | `[]` / `blacklist` | 谁能让 bot 通过 Tool 读说说 |
 | `read_number` | `5` | 一次取的说说数 |
 | `like_probability` / `comment_probability` | `1.0` / `1.0` | 点赞/评论概率 |
+| `allow_skip_comment` | `true` | 模型可输出「不回复」跳过评论 |
 | `prompt` / `rt_prompt` | 见 config | 普通说说 / 转发说说的评论模板 |
+
+`read_feed` 工具额外支持 `enable_comment=false`（或「不回复」）强制只读不评论。
 
 ### `[monitor]` 刷空间
 | 项 | 默认 | 说明 |
