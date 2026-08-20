@@ -249,10 +249,11 @@ class MaiTracePlugin(MaiBotPlugin):
 
     @Tool(
         "read_feed",
-        description="读取指定好友最近的 QQ 空间动态并评论点赞（附结果回复）。",
+        description="读取指定好友最近的 QQ 空间动态；可用 enable_comment=false 只读不评论。",
         detailed_description=(
             "适用场景：需要查看某人动态/说说/QQ 空间，或有人希望你评价某人的空间内容时。"
             "典型触发词：说说 / 空间 / 动态。"
+            "若用户只要看不要评，传入 enable_comment=false / 不回复。"
         ),
         parameters=[
             ToolParameterInfo(
@@ -265,6 +266,12 @@ class MaiTracePlugin(MaiBotPlugin):
                 name="user_name",
                 param_type=ToolParamType.STRING,
                 description="要求你阅读动态的好友的 QQ 名称",
+                required=False,
+            ),
+            ToolParameterInfo(
+                name="enable_comment",
+                param_type=ToolParamType.STRING,
+                description="是否评论：true/false；false、否、不回复=只读不评论。默认 true",
                 required=False,
             ),
         ],
